@@ -1,0 +1,9 @@
+[package]
+name = "hms2osc"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+directories = "5.0"
+huelib = "0.13"
+rosc = "~0.10"
