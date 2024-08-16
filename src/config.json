@@ -1,0 +1,18 @@
+{
+  "bridge_host": "10.0.0.7",
+  "poll_interval": 1,
+  "sensors": [
+    {
+      "name": "Hue motion sensor 1",
+      "kind": "Presence"
+    },
+    {
+      "name": "Hue temperature sensor 1",
+      "kind": "Temperature"
+    },
+    {
+      "name": "Hue ambient light sensor 1",
+      "kind": "AmbientLight"
+    }
+  ]
+}
