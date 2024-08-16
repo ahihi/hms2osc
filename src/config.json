@@ -1,17 +1,21 @@
 {
   "bridge_host": "10.0.0.7",
+  "osc_out_addr": "10.0.0.2:9000",
   "poll_interval": 1,
   "sensors": [
     {
       "name": "Hue motion sensor 1",
+      "osc_address": "/presence",
       "kind": "Presence"
     },
     {
       "name": "Hue temperature sensor 1",
+      "osc_address": "/temperature",
       "kind": "Temperature"
     },
     {
       "name": "Hue ambient light sensor 1",
+      "osc_address": "/ambient_light",
       "kind": "AmbientLight"
     }
   ]

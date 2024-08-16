@@ -1,15 +1,14 @@
 use std::env;
 use std::fs::{self, File};
 use std::io::{self, BufReader, Write};
-use std::net::{IpAddr, Ipv4Addr};
+use std::net::{IpAddr, Ipv4Addr, SocketAddrV4, UdpSocket};
 use std::path::PathBuf;
 use std::thread;
 use std::time::Duration;
 
 use directories::ProjectDirs;
 use huelib::{self, resource::sensor::Sensor};
-use rosc::encoder;
-use rosc::{OscMessage, OscPacket};
+use rosc::{encoder, OscMessage, OscPacket, OscType};
 use serde::{Serialize, Deserialize};
 use serde_json;
 
@@ -21,18 +20,27 @@ pub enum SensorKind {
 }
 
 impl SensorKind {
-    pub fn get_data(&self, sensor: &Sensor) -> () {
+    pub fn push_data(&self, sensor: &Sensor, args: &mut Vec<OscType>) -> () {
         match self {
             SensorKind::AmbientLight => {
-                println!("ambient light: light_level={:?}, dark={:?}, daylight={:?}", sensor.state.light_level, sensor.state.dark, sensor.state.daylight);
-                // conversion to lux:
-                // lx = round(float(10 ** ((lightlevel - 1) / 10000))
+                let light_level = sensor.state.light_level.unwrap();
+                let dark = sensor.state.dark.unwrap();
+                let daylight = sensor.state.daylight.unwrap();
+                let lux = 10.0_f32.powf((light_level - 1) as f32 / 10000.0);
+
+                args.push(OscType::Float(lux));
+                args.push(OscType::Float(if dark { 1.0 } else { 0.0 }));
+                args.push(OscType::Float(if daylight { 1.0 } else { 0.0 }));
             },
             SensorKind::Presence => {
-                println!("presence: presence={:?}", sensor.state.presence);
+                let presence = sensor.state.presence.unwrap();
+
+                args.push(OscType::Float(if presence { 1.0 } else { 0.0 }));
             },
             SensorKind::Temperature => {
-                println!("temperature: temperature={:?}", sensor.state.temperature);
+                let temperature = sensor.state.temperature.unwrap();
+
+                args.push(OscType::Float(temperature as f32 / 100.0));
             },
         }
     }
@@ -41,12 +49,14 @@ impl SensorKind {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct SensorConfig {
     pub name: String,
+    pub osc_address: String,
     pub kind: SensorKind,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Config {
     pub bridge_host: IpAddr,
+    pub osc_out_addr: SocketAddrV4,
     pub poll_interval: f32,
     pub sensors: Vec<SensorConfig>,
 }
@@ -90,22 +100,35 @@ fn main() {
     let bridge = huelib::bridge::Bridge::new(addr, username);
     let all_sensors = bridge.get_all_sensors().unwrap();
     println!("all_sensors: {:?}", all_sensors);
-    let sensors = config.sensors.iter()
+    let mut sensors = config.sensors.iter()
         .map(|sensor_config| {
             let id = &all_sensors.iter()
                 .filter(|s| s.name == sensor_config.name)
                 .next().unwrap().id;
-            (id, sensor_config)
+            let osc_packet = OscPacket::Message(OscMessage {
+                addr: sensor_config.osc_address.clone(),
+                args: Vec::new()
+            });
+            (id, sensor_config, osc_packet)
         })
         .collect::<Vec<_>>();
 
+    let host_addr = SocketAddrV4::new(Ipv4Addr::new(0, 0, 0, 0), 0);
+    let sock = UdpSocket::bind(host_addr).unwrap();
+
     loop {
-        for (id, sensor_config) in sensors.iter() {
+        for (id, sensor_config, ref mut osc_packet) in sensors.iter_mut() {
+            let OscPacket::Message(ref mut osc_msg) = osc_packet else {
+                unreachable!();
+            };
+            osc_msg.args.clear();
             let sensor = bridge.get_sensor(*id).unwrap();
-            // let presence = sensor.state.presence;
-            // println!("sensor: {:?}", sensor);
             println!("sensor {} ({})", sensor_config.name, id);
-            sensor_config.kind.get_data(&sensor);
+            sensor_config.kind.push_data(&sensor, &mut osc_msg.args);
+            println!("osc_msg: {:?}", osc_msg);
+
+            let msg_buf = encoder::encode(&osc_packet).unwrap();
+            sock.send_to(&msg_buf, config.osc_out_addr).unwrap();
         }
         thread::sleep(poll_interval);
     }
