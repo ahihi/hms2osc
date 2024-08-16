@@ -5,16 +5,19 @@
   "sensors": [
     {
       "name": "Hue motion sensor 1",
+      "enabled": true,
       "osc_address": "/presence",
       "kind": "Presence"
     },
     {
       "name": "Hue temperature sensor 1",
+      "enabled": false,
       "osc_address": "/temperature",
       "kind": "Temperature"
     },
     {
       "name": "Hue ambient light sensor 1",
+      "enabled": false,
       "osc_address": "/ambient_light",
       "kind": "AmbientLight"
     }

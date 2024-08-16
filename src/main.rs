@@ -49,6 +49,7 @@ impl SensorKind {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct SensorConfig {
     pub name: String,
+    pub enabled: bool,
     pub osc_address: String,
     pub kind: SensorKind,
 }
@@ -101,7 +102,9 @@ fn main() {
     let all_sensors = bridge.get_all_sensors().unwrap();
     println!("all_sensors: {:?}", all_sensors);
     let mut sensors = config.sensors.iter()
+        .filter(|sensor_config| sensor_config.enabled)
         .map(|sensor_config| {
+
             let id = &all_sensors.iter()
                 .filter(|s| s.name == sensor_config.name)
                 .next().unwrap().id;
