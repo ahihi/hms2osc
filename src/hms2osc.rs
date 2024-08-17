@@ -136,9 +136,9 @@ impl SensorTransformer {
         match self.sensor_config.kind {
             SensorKind::AmbientLight => {
                 let light_level = sensor.state.light_level.unwrap();
+                let lux = 10.0_f32.powf((light_level - 1) as f32 / 10000.0);
                 let dark = sensor.state.dark.unwrap();
                 let daylight = sensor.state.daylight.unwrap();
-                let lux = 10.0_f32.powf((light_level - 1) as f32 / 10000.0);
 
                 msg.args.push(OscType::Float(lux));
                 msg.args.push(OscType::Float(if dark { 1.0 } else { 0.0 }));
