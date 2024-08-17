@@ -1,6 +1,6 @@
 {
   "bridge_host": "10.0.0.7",
-  "osc_out_addr": "10.0.0.2:9000",
+  "osc_out_addr": "localhost:9000",
   "poll_interval": 1,
   "sensors": [
     {
@@ -11,13 +11,13 @@
     },
     {
       "name": "Hue temperature sensor 1",
-      "enabled": false,
+      "enabled": true,
       "osc_address": "/temperature",
       "kind": "Temperature"
     },
     {
       "name": "Hue ambient light sensor 1",
-      "enabled": false,
+      "enabled": true,
       "osc_address": "/ambient_light",
       "kind": "AmbientLight"
     }

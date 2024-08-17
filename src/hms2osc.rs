@@ -1,7 +1,7 @@
 use std::fmt;
 use std::fs;
 use std::io::{self, Write};
-use std::net::IpAddr;
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6, ToSocketAddrs};
 use std::path::{Path, PathBuf};
 use std::thread;
 use std::time::Duration;
@@ -34,6 +34,23 @@ pub struct SensorConfig {
 pub enum FromFileError {
     Io(#[from] io::Error),
     SerdeJson(#[from] serde_json::Error)
+}
+
+pub fn to_ip(host_str: &str) -> io::Result<IpAddr> {
+    let first_addr = format!("{}:0", host_str).to_socket_addrs()?.next().unwrap();
+    Ok(first_addr.ip())
+}
+
+pub fn to_socket_addr(s: &str) -> io::Result<SocketAddr> {
+    let first_addr = s.to_socket_addrs()?.next().unwrap();
+    Ok(first_addr)
+}
+
+pub fn to_bind_addr(dst_addr: SocketAddr) -> SocketAddr {
+    match dst_addr {
+        SocketAddr::V4(_) => SocketAddrV4::new(Ipv4Addr::new(0, 0, 0, 0), 0).into(),
+        SocketAddr::V6(_) => SocketAddrV6::new(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 0), 0, 0, 0).into()
+    }
 }
 
 pub fn register_hue_user(bridge_host: IpAddr) -> Result<String,huelib::Error> {
