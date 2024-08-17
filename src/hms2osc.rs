@@ -8,7 +8,7 @@ use std::time::Duration;
 
 use directories::ProjectDirs;
 use huelib::{self, bridge::Bridge, resource::sensor::Sensor};
-use log::{error, warn, info, debug, trace};
+use log::{error, info, debug};
 use rosc::{OscMessage, OscPacket, OscType};
 use serde::{Serialize, Deserialize};
 use serde_json;

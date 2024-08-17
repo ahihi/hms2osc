@@ -1,17 +1,31 @@
 use std::fs::File;
 use std::io::BufReader;
 use std::net::{IpAddr, Ipv4Addr, SocketAddrV4, UdpSocket};
+use std::path::PathBuf;
 use std::thread;
 use std::time::Duration;
 
+use clap::Parser;
 use colog;
 use huelib;
-use log::{error, warn, info, debug, trace};
+use log::{info};
 use rosc;
 use serde::{Serialize, Deserialize};
 use serde_json;
 
 mod hms2osc;
+
+#[derive(Parser)]
+#[command(version, about, long_about = None)]
+struct Options {
+    /// Set a config file
+    #[arg(short, long, value_name = "FILE")]
+    config: PathBuf,
+
+    /// Set logging level
+    #[arg(short, long)]
+    log: Option<String>,
+}
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Config {
@@ -22,16 +36,17 @@ pub struct Config {
 }
 
 fn main() {
+    let options = Options::parse();
+
     let mut colog_builder = colog::default_builder();
-    // if let Some(ref filters_str) = options.log {
-    //     colog_builder.parse_filters(filters_str);
-    // }
+    if let Some(ref filters_str) = options.log {
+        colog_builder.parse_filters(filters_str);
+    }
     colog_builder.init();
 
-    let config_file_path = "./config.json";
-    info!("config file path: {:?}", config_file_path);
+    info!("config file path: {:?}", options.config);
 
-    let config_file = File::open(&config_file_path).unwrap();
+    let config_file = File::open(&options.config).unwrap();
     let config_reader = BufReader::new(config_file);
     let config: Config = serde_json::from_reader(config_reader).unwrap();
     info!("bridge host: {}", config.bridge_host);
