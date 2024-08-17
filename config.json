@@ -1,6 +1,6 @@
 {
   "bridge_host": "10.0.0.7",
-  "osc_out_addr": "localhost:9000",
+  "osc_out_addr": "127.0.0.1:9000",
   "poll_interval": 1,
   "sensors": [
     {

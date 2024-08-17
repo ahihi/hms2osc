@@ -8,7 +8,7 @@ use std::time::Duration;
 
 use directories::ProjectDirs;
 use huelib::{self, bridge::Bridge, resource::sensor::Sensor};
-use log::{error, info, debug};
+use log::{error, warn, info, debug};
 use rosc::{OscMessage, OscPacket, OscType};
 use serde::{Serialize, Deserialize};
 use serde_json;
@@ -37,12 +37,14 @@ pub enum FromFileError {
 }
 
 pub fn to_ip(host_str: &str) -> io::Result<IpAddr> {
-    let first_addr = format!("{}:0", host_str).to_socket_addrs()?.next().unwrap();
+    let first_addr = format!("{}:0", host_str).to_socket_addrs()?.next()
+        .expect("to_socket_addrs() returned no addresses");
     Ok(first_addr.ip())
 }
 
 pub fn to_socket_addr(s: &str) -> io::Result<SocketAddr> {
-    let first_addr = s.to_socket_addrs()?.next().unwrap();
+    let first_addr = s.to_socket_addrs()?.next()
+        .expect("to_socket_addrs() returned no addresses");
     Ok(first_addr)
 }
 
@@ -76,7 +78,8 @@ pub fn register_hue_user(bridge_host: IpAddr) -> Result<String,huelib::Error> {
 }
 
 pub fn default_hue_user_file_path() -> PathBuf {
-    let proj_dirs = ProjectDirs::from("fi", "pulusound", env!("CARGO_PKG_NAME")).unwrap();
+    let proj_dirs = ProjectDirs::from("fi", "pulusound", env!("CARGO_PKG_NAME"))
+        .expect("failed to determine project directories");
     let path = proj_dirs.data_dir().join("username.txt");
     path
 }
@@ -86,7 +89,8 @@ pub fn ensure_hue_user<P: AsRef<Path>>(bridge_host: IpAddr, user_file_path: P) -
         Err(e) if e.kind() == io::ErrorKind::NotFound => {
             let name = register_hue_user(bridge_host)?;
 
-            let parent_dir = user_file_path.as_ref().parent().unwrap();
+            let parent_dir = user_file_path.as_ref().parent()
+                .expect("failed to get parent directory of Hue user file path");
             fs::create_dir_all(&parent_dir)?;
             let mut file = fs::File::create(&user_file_path)?;
             write!(file, "{}", name)?;
@@ -135,28 +139,41 @@ impl SensorTransformer {
 
         match self.sensor_config.kind {
             SensorKind::AmbientLight => {
-                let light_level = sensor.state.light_level.unwrap();
-                let lux = 10.0_f32.powf((light_level - 1) as f32 / 10000.0);
-                let dark = sensor.state.dark.unwrap();
-                let daylight = sensor.state.daylight.unwrap();
+                // light level, converted to lux
+                msg.args.push(map_osc(
+                    sensor.state.light_level,
+                    |level| OscType::Float(10.0_f32.powf((level - 1) as f32 / 10000.0))
+                ));
 
-                msg.args.push(OscType::Float(lux));
-                msg.args.push(OscType::Float(if dark { 1.0 } else { 0.0 }));
-                msg.args.push(OscType::Float(if daylight { 1.0 } else { 0.0 }));
+                msg.args.push(map_osc(
+                    sensor.state.dark,
+                    |dark| OscType::Float(if dark { 1.0 } else { 0.0 })
+                ));
+
+                msg.args.push(map_osc(
+                    sensor.state.daylight,
+                    |daylight| OscType::Float(if daylight { 1.0 } else { 0.0 })
+                ));
             },
             SensorKind::Presence => {
-                let presence = sensor.state.presence.unwrap();
-
-                msg.args.push(OscType::Float(if presence { 1.0 } else { 0.0 }));
+                msg.args.push(map_osc(
+                    sensor.state.presence,
+                    |presence| OscType::Float(if presence { 1.0 } else { 0.0 })
+                ));
             },
             SensorKind::Temperature => {
-                let temperature = sensor.state.temperature.unwrap();
-
-                msg.args.push(OscType::Float(temperature as f32 / 100.0));
+                msg.args.push(map_osc(
+                    sensor.state.temperature,
+                    |temperature| OscType::Float(temperature as f32 / 100.0)
+                ));
             },
         }
 
         debug!("osc: {:?}", msg);
+
+        if msg.args.iter().any(|arg| *arg == OscType::Nil) {
+            warn!("failed to retrieve some data from {} ({}), kind={:?} - is this the correct kind of sensor?", self.sensor_config.name, self.id, self.sensor_config.kind);
+        }
 
         Ok(())
     }
@@ -175,7 +192,16 @@ pub fn prepare_sensor_transformers<'a>(sensors: &'a [Sensor], sensor_configs: &'
         .map(|sensor_config| {
             let id = sensors.iter()
                 .filter(|s| s.name == sensor_config.name)
-                .next().unwrap().id.clone();
+                .next()
+                .unwrap_or_else(|| panic!("sensor {:?} not found", sensor_config.name))
+                .id.clone();
             SensorTransformer::new(id, sensor_config.clone())
         })
+}
+
+fn map_osc<T, F>(opt: Option<T>, f: F) -> OscType where F: FnOnce(T) -> OscType {
+    match opt {
+        Some(x) => f(x),
+        None => OscType::Nil
+    }
 }

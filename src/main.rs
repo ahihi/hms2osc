@@ -46,23 +46,29 @@ fn main() {
 
     info!("config file path: {}", options.config.display());
 
-    let config_file = File::open(&options.config).unwrap();
+    let config_file = File::open(&options.config)
+        .expect("failed to open config file");
     let config_reader = BufReader::new(config_file);
-    let config: Config = serde_json::from_reader(config_reader).unwrap();
+    let config: Config = serde_json::from_reader(config_reader)
+        .expect("failed to parse config file");
 
-    let bridge_host = hms2osc::to_ip(&config.bridge_host).unwrap();
+    let bridge_host = hms2osc::to_ip(&config.bridge_host)
+        .expect("failed to validate bridge host");
     info!("bridge host: {} ({:?})", config.bridge_host, bridge_host);
 
-    let osc_out_addr = hms2osc::to_socket_addr(&config.osc_out_addr).unwrap();
+    let osc_out_addr = hms2osc::to_socket_addr(&config.osc_out_addr)
+        .expect("failed to validate OSC output address");
     info!("osc output address: {} ({:?})", config.osc_out_addr, osc_out_addr);
 
     let user_file_path = hms2osc::default_hue_user_file_path();
     debug!("user file path: {}", user_file_path.display());
     info!("connecting to bridge");
-    let username = hms2osc::ensure_hue_user(bridge_host, user_file_path).unwrap();
+    let username = hms2osc::ensure_hue_user(bridge_host, user_file_path)
+        .expect("failed to ensure a Hue user exists");
 
     let bridge = huelib::bridge::Bridge::new(bridge_host, username);
-    let all_sensors = bridge.get_all_sensors().unwrap();
+    let all_sensors = bridge.get_all_sensors()
+        .expect("failed to get sensors");
     let mut sensor_tfs = hms2osc::prepare_sensor_transformers(&all_sensors, &config.sensors)
         .collect::<Vec<_>>();
 
@@ -71,16 +77,20 @@ fn main() {
         .collect::<Vec<_>>().join("\n");
     info!("enabled sensors:\n{}", sensors_str);
 
-    let sock = UdpSocket::bind(hms2osc::to_bind_addr(osc_out_addr)).unwrap();
+    let sock = UdpSocket::bind(hms2osc::to_bind_addr(osc_out_addr))
+        .expect("failed to bind UDP socket");
     let poll_interval = Duration::from_secs_f32(config.poll_interval);
 
     info!("polling sensors every {} seconds", poll_interval.as_secs());
     loop {
         for sensor_tf in sensor_tfs.iter_mut() {
-            sensor_tf.update(&bridge).unwrap();
+            sensor_tf.update(&bridge)
+                .expect("failed to read sensor data");
 
-            let msg_buf = rosc::encoder::encode(&sensor_tf.osc_packet).unwrap();
-            sock.send_to(&msg_buf, osc_out_addr).unwrap();
+            let msg_buf = rosc::encoder::encode(&sensor_tf.osc_packet)
+                .expect("failed to encode OSC message");
+            sock.send_to(&msg_buf, osc_out_addr)
+                .expect("failed to send OSC message");
         }
 
         thread::sleep(poll_interval);
