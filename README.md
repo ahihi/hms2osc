@@ -82,7 +82,7 @@ data from different sensor kinds will be converted to OSC as follows:
 
 1. temperature (float): temperature in degrees Celsius
 
-### `AmbientLight`
+### `LightLevel`
 
 1. lux (float): ambient light level in lux
 2. dark (float): 1.0 if the sensor's "dark" flag is set, 0.0 otherwise
