@@ -15,8 +15,9 @@ use serde_json;
 use thiserror::Error;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum SensorKind {
-    AmbientLight,
+    LightLevel,
     Presence,
     Temperature,
 }
@@ -26,7 +27,6 @@ pub struct SensorConfig {
     pub name: String,
     pub enabled: bool,
     pub osc_address: String,
-    pub kind: SensorKind,
 }
 
 #[derive(Error, Debug)]
@@ -113,14 +113,16 @@ pub enum EnsureHueUserError {
 #[derive(Debug)]
 pub struct SensorTransformer {
     pub id: String,
+    pub kind: SensorKind,
     pub sensor_config: SensorConfig,
     pub osc_packet: OscPacket,
 }
 
 impl SensorTransformer {
-    pub fn new(id: String, sensor_config: SensorConfig) -> SensorTransformer {
+    pub fn new(id: String, kind: SensorKind, sensor_config: SensorConfig) -> SensorTransformer {
         Self {
             id,
+            kind,
             sensor_config: sensor_config.clone(),
             osc_packet: OscPacket::Message(OscMessage {
                 addr: sensor_config.osc_address,
@@ -137,8 +139,8 @@ impl SensorTransformer {
         let sensor = bridge.get_sensor(&self.id)?;
         debug!("update sensor {} ({})", self.id, self.sensor_config.name);
 
-        match self.sensor_config.kind {
-            SensorKind::AmbientLight => {
+        match self.kind {
+            SensorKind::LightLevel => {
                 // light level, converted to lux
                 msg.args.push(map_osc(
                     sensor.state.light_level,
@@ -172,7 +174,7 @@ impl SensorTransformer {
         debug!("osc: {:?}", msg);
 
         if msg.args.iter().any(|arg| *arg == OscType::Nil) {
-            warn!("failed to retrieve some data from {} ({}), kind={:?} - is this the correct kind of sensor?", self.sensor_config.name, self.id, self.sensor_config.kind);
+            warn!("failed to retrieve some data from {} ({}), kind={:?}", self.sensor_config.name, self.id, self.kind);
         }
 
         Ok(())
@@ -182,7 +184,7 @@ impl SensorTransformer {
 impl fmt::Display for SensorTransformer {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let sc = &self.sensor_config;
-        write!(f, "{} ({}), kind={:?} -> {}", sc.name, self.id, sc.kind, sc.osc_address)
+        write!(f, "{} ({}), kind={:?} -> {}", sc.name, self.id, self.kind, sc.osc_address)
     }
 }
 
@@ -190,13 +192,24 @@ pub fn prepare_sensor_transformers<'a>(sensors: &'a [Sensor], sensor_configs: &'
     sensor_configs.iter()
         .filter(|sensor_config| sensor_config.enabled)
         .map(|sensor_config| {
-            let id = sensors.iter()
+            let sensor = sensors.iter()
                 .filter(|s| s.name == sensor_config.name)
                 .next()
-                .unwrap_or_else(|| panic!("sensor {:?} not found", sensor_config.name))
-                .id.clone();
-            SensorTransformer::new(id, sensor_config.clone())
+                .unwrap_or_else(|| panic!("sensor {:?} not found", sensor_config.name));
+            let id = sensor.id.clone();
+            let kind = type_name_to_kind(&sensor.type_name)
+                .unwrap_or_else(|| unimplemented!("{}", sensor.type_name));
+            SensorTransformer::new(id, kind, sensor_config.clone())
         })
+}
+
+pub fn type_name_to_kind(type_name: &str) -> Option<SensorKind> {
+    match type_name {
+        "ZLLLightLevel" => Some(SensorKind::LightLevel),
+        "ZLLPresence" => Some(SensorKind::Presence),
+        "ZLLTemperature" => Some(SensorKind::Temperature),
+        _ => None
+    }
 }
 
 fn map_osc<T, F>(opt: Option<T>, f: F) -> OscType where F: FnOnce(T) -> OscType {

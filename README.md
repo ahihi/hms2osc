@@ -18,6 +18,26 @@ prepare a [configuration file](#configuration) (named `config.json` in this exam
 hms2osc -c config.json
 ```
 
+to see what sensors are available, run with `--list`:
+
+```
+hms2osc -c config.json --list
+```
+
+example output:
+
+```
+[*] available sensors:
+ |  Hue ambient light sensor 1 (6), kind=LightLevel (type_name=ZLLLightLevel)
+ |    State { presence: None, flag: None, last_updated: Some(2024-08-18T01:20:40), button_event: None, temperature: None, light_level: Some(4370), dark: Some(true), daylight: Some(false) }
+ |  Daylight (1), kind=? (type_name=Daylight)
+ |    State { presence: None, flag: None, last_updated: None, button_event: None, temperature: None, light_level: None, dark: None, daylight: None }
+ |  Hue temperature sensor 1 (7), kind=Temperature (type_name=ZLLTemperature)
+ |    State { presence: None, flag: None, last_updated: Some(2024-08-18T01:23:45), button_event: None, temperature: Some(2561), light_level: None, dark: None, daylight: None }
+ |  Hue motion sensor 1 (5), kind=Presence (type_name=ZLLPresence)
+ |    State { presence: Some(true), flag: None, last_updated: Some(2024-08-18T01:25:04), button_event: None, temperature: None, light_level: None, dark: None, daylight: None }
+```
+
 to view the full list of supported command-line options, run `hms2osc -h`:
 
 ```
@@ -25,6 +45,7 @@ Usage: hms2osc [OPTIONS] --config <FILE>
 
 Options:
   -c, --config <FILE>  Set a config file
+      --list           List available sensors
   -l, --log <LOG>      Set logging level
   -h, --help           Print help
   -V, --version        Print version
@@ -48,11 +69,10 @@ the configuration is a JSON object with the following properties:
 - `name`: human-readable name of the sensor, as specified on the Hue bridge
 - `enabled`: whether or not to process data from this sensor
 - `osc_address`: OSC address where data from this sensor should be sent
-- `kind`: the kind of data provided by this sensor (`Presence`, `Temperature` or `AmbientLight`)
 
 ## OSC data
 
-data from the different sensor kinds will be converted to OSC as follows:
+data from different sensor kinds will be converted to OSC as follows:
 
 ### `Presence`
 

@@ -22,6 +22,10 @@ struct Options {
     #[arg(short, long, value_name = "FILE")]
     config: PathBuf,
 
+    /// List available sensors
+    #[arg(long)]
+    list: bool,
+
     /// Set logging level
     #[arg(short, long)]
     log: Option<String>,
@@ -56,10 +60,6 @@ fn main() {
         .expect("failed to validate bridge host");
     info!("bridge host: {} ({:?})", config.bridge_host, bridge_host);
 
-    let osc_out_addr = hms2osc::to_socket_addr(&config.osc_out_addr)
-        .expect("failed to validate OSC output address");
-    info!("osc output address: {} ({:?})", config.osc_out_addr, osc_out_addr);
-
     let user_file_path = hms2osc::default_hue_user_file_path();
     debug!("user file path: {}", user_file_path.display());
     info!("connecting to bridge");
@@ -69,6 +69,20 @@ fn main() {
     let bridge = huelib::bridge::Bridge::new(bridge_host, username);
     let all_sensors = bridge.get_all_sensors()
         .expect("failed to get sensors");
+
+    if options.list {
+        let sensors_str = all_sensors.iter()
+            .map(|sensor| {
+                let kind_str = hms2osc::type_name_to_kind(&sensor.type_name)
+                    .map(|kind| format!("{:?}", kind))
+                    .unwrap_or("?".to_string());
+                format!("{} ({}), kind={} (type_name={})\n  {:?}", sensor.name, sensor.id, kind_str, sensor.type_name, sensor.state)
+            })
+            .collect::<Vec<_>>().join("\n");
+        info!("available sensors:\n{sensors_str}");
+        return;
+    }
+
     let mut sensor_tfs = hms2osc::prepare_sensor_transformers(&all_sensors, &config.sensors)
         .collect::<Vec<_>>();
 
@@ -76,6 +90,10 @@ fn main() {
         .map(|sensor_tf| format!("{}", sensor_tf))
         .collect::<Vec<_>>().join("\n");
     info!("enabled sensors:\n{}", sensors_str);
+
+    let osc_out_addr = hms2osc::to_socket_addr(&config.osc_out_addr)
+        .expect("failed to validate OSC output address");
+    info!("osc output address: {} ({:?})", config.osc_out_addr, osc_out_addr);
 
     let sock = UdpSocket::bind(hms2osc::to_bind_addr(osc_out_addr))
         .expect("failed to bind UDP socket");
