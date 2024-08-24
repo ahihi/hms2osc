@@ -25,8 +25,21 @@ pub enum SensorKind {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct SensorConfig {
     pub name: String,
+    #[serde(default = "SensorConfig::enabled_default")]
     pub enabled: bool,
     pub osc_address: String,
+    #[serde(default = "SensorConfig::send_changes_only_default")]
+    pub send_changes_only: bool,
+}
+
+impl SensorConfig {
+    fn enabled_default() -> bool {
+        true
+    }
+
+    fn send_changes_only_default() -> bool {
+        false
+    }
 }
 
 #[derive(Error, Debug)]
@@ -116,6 +129,7 @@ pub struct SensorTransformer {
     pub kind: SensorKind,
     pub sensor_config: SensorConfig,
     pub osc_packet: OscPacket,
+    pub last_osc_args: Vec<OscType>,
 }
 
 impl SensorTransformer {
@@ -127,7 +141,8 @@ impl SensorTransformer {
             osc_packet: OscPacket::Message(OscMessage {
                 addr: sensor_config.osc_address,
                 args: Vec::new()
-            })
+            }),
+            last_osc_args: Vec::new()
         }
     }
 
@@ -135,6 +150,12 @@ impl SensorTransformer {
         let OscPacket::Message(ref mut msg) = self.osc_packet else {
             unreachable!();
         };
+
+        self.last_osc_args.clear();
+        for arg in msg.args.iter() {
+            self.last_osc_args.push(arg.clone());
+        }
+
         msg.args.clear();
         let sensor = bridge.get_sensor(&self.id)?;
         debug!("update sensor {} ({})", self.id, self.sensor_config.name);

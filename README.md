@@ -67,8 +67,9 @@ the configuration is a JSON object with the following properties:
 ### sensor configuration
 
 - `name`: human-readable name of the sensor, as specified on the Hue bridge
-- `enabled`: whether or not to process data from this sensor
+- `enabled`: whether or not to process data from this sensor (default: `true`)
 - `osc_address`: OSC address where data from this sensor should be sent
+- `send_changes_only`: whether to send OSC only when the sensor data changes, otherwise the data is sent on every poll (default: `false`)
 
 ## OSC data
 

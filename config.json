@@ -6,7 +6,8 @@
     {
       "name": "Hue motion sensor 1",
       "enabled": true,
-      "osc_address": "/presence"
+      "osc_address": "/presence",
+      "send_changes_only": true
     },
     {
       "name": "Hue temperature sensor 1",

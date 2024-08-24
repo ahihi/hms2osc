@@ -105,6 +105,15 @@ fn main() {
             sensor_tf.update(&bridge)
                 .expect("failed to read sensor data");
 
+            let rosc::OscPacket::Message(ref mut msg) = sensor_tf.osc_packet else {
+                unreachable!();
+            };
+
+            if msg.args == sensor_tf.last_osc_args {
+                debug!("sensor {} ({}) data unchanged, not sending", sensor_tf.id, sensor_tf.sensor_config.name);
+                continue;
+            }
+
             let msg_buf = rosc::encoder::encode(&sensor_tf.osc_packet)
                 .expect("failed to encode OSC message");
             sock.send_to(&msg_buf, osc_out_addr)
