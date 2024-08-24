@@ -109,7 +109,7 @@ fn main() {
                 unreachable!();
             };
 
-            if msg.args == sensor_tf.last_osc_args {
+            if sensor_tf.sensor_config.send_changes_only && msg.args == sensor_tf.last_osc_args {
                 debug!("sensor {} ({}) data unchanged, not sending", sensor_tf.id, sensor_tf.sensor_config.name);
                 continue;
             }
